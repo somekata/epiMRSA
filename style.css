@@ -205,3 +205,17 @@ table th, table td {
   margin-left: 10px;
   font-size: 0.85rem;
 }
+
+/* 期間モーダルの日付入力 */
+.date-row{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin:6px 0;
+}
+.date-row input[type="date"]{
+  padding:6px 8px;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  font-size:0.95rem;
+}

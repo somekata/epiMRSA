@@ -35,6 +35,7 @@
           </div>
 
           <button id="facilitySelectBtn" class="ctrl-btn">施設を選ぶ</button>
+          <button id="periodSelectBtn" class="ctrl-btn">期間を選ぶ</button>
           <button id="potSelectBtn" class="ctrl-btn">POTを選ぶ</button>
 
           <div id="currentSelection" class="selection-text">
@@ -80,6 +81,29 @@
           <button id="facilityAllOn" class="ghost">全選択</button>
           <button id="facilityAllOff" class="ghost">全解除</button>
           <button id="facilityApply" class="primary">適用</button>
+          <button class="close">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 期間選択モーダル ===== -->
+    <div id="periodModal" class="modal hidden">
+      <div class="modal-bg"></div>
+      <div class="modal-box">
+        <h3>表示する期間を選択</h3>
+
+        <div class="date-row">
+          <label>開始日：</label>
+          <input type="date" id="periodStart" />
+        </div>
+        <div class="date-row">
+          <label>終了日：</label>
+          <input type="date" id="periodEnd" />
+        </div>
+
+        <div class="modal-actions">
+          <button id="periodReset" class="ghost">全期間に戻す</button>
+          <button id="periodApply" class="primary">適用</button>
           <button class="close">閉じる</button>
         </div>
       </div>

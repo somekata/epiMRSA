@@ -14,6 +14,10 @@ let showMA = true;
 let selectedGroups = new Set(["ALL"]);  // ALLと施設名が入る
 let selectedPots = new Set();           // CSV読み込み後に全POTで初期化。空ならPOT線なし
 
+// 期間フィルタ（null=nullで全期間）
+let selectedStartDate = null; // "YYYY-MM-DD" or null
+let selectedEndDate = null;
+
 // POT色
 const POT_COLORS = {
   1: "#8FB3FF",
@@ -121,6 +125,9 @@ function initSelectionsAfterLoad(){
   selectedGroups = new Set(["ALL", ...facilities]);
   selectedPots = new Set(pots); // 初期は全POT表示
 
+  selectedStartDate = null;
+  selectedEndDate = null;
+
   buildFacilityModalOptions();
   buildPotModalOptions();
   updateSelectionText();
@@ -132,6 +139,16 @@ function getFacilities(){
 }
 function getPots(){
   return Array.from(new Set(records.map(r => r.pot))).sort((a,b)=>a-b);
+}
+function filterRecordsByDate(recList){
+  if(!selectedStartDate && !selectedEndDate) return recList;
+
+  return recList.filter(r=>{
+    const d = normalizeDate(r.date);
+    if(selectedStartDate && d < selectedStartDate) return false;
+    if(selectedEndDate && d > selectedEndDate) return false;
+    return true;
+  });
 }
 
 // 日付正規化："2025-1-9"→"2025-01-09"
@@ -185,6 +202,7 @@ function drawTimeSeries() {
   if (!wrap) return;
   wrap.innerHTML = "";
   if (!records.length) return;
+  const filteredRecords = filterRecordsByDate(records);
 
   const facilities = getFacilities();
   const potsAll = getPots();
@@ -196,15 +214,15 @@ function drawTimeSeries() {
 
   // 選択されたグループを並べる
   const groups = [];
-  if (selectedGroups.has("ALL")) {
-    groups.push({ key:"ALL", label:"全体", data: records });
-  }
+    if (selectedGroups.has("ALL")) {
+    groups.push({ key:"ALL", label:"全体", data: filteredRecords });
+    }
   facilities.forEach(f=>{
     if (selectedGroups.has(f)) {
       groups.push({
         key:f,
         label:`施設 ${f}`,
-        data: records.filter(r=>r.facility===f)
+        data: filteredRecords.filter(r=>r.facility===f)
       });
     }
   });
@@ -586,6 +604,55 @@ document.getElementById("potApply").addEventListener("click", ()=>{
 });
 
 // =======================================================
+// UI：期間モーダル
+// =======================================================
+const periodModal = document.getElementById("periodModal");
+const periodBtn = document.getElementById("periodSelectBtn");
+const periodStartInput = document.getElementById("periodStart");
+const periodEndInput = document.getElementById("periodEnd");
+
+if(periodBtn && periodModal){
+  periodBtn.addEventListener("click", ()=>{
+    if(!records.length) return;
+
+    // 現在値をモーダルに反映
+    periodStartInput.value = selectedStartDate || "";
+    periodEndInput.value = selectedEndDate || "";
+
+    openModal(periodModal);
+  });
+}
+
+document.getElementById("periodReset").addEventListener("click", ()=>{
+  selectedStartDate = null;
+  selectedEndDate = null;
+  periodStartInput.value = "";
+  periodEndInput.value = "";
+  closeModal(periodModal);
+  updateSelectionText();
+  drawTimeSeries();
+});
+
+document.getElementById("periodApply").addEventListener("click", ()=>{
+  const s = periodStartInput.value || null;
+  const e = periodEndInput.value || null;
+
+  // start > end の場合は入れ替え
+  if(s && e && s > e){
+    selectedStartDate = e;
+    selectedEndDate = s;
+  } else {
+    selectedStartDate = s;
+    selectedEndDate = e;
+  }
+
+  closeModal(periodModal);
+  updateSelectionText();
+  drawTimeSeries();
+});
+
+
+// =======================================================
 // モーダル開閉共通
 // =======================================================
 function openModal(modal){
@@ -611,8 +678,14 @@ function updateSelectionText(){
     ? Array.from(selectedPots).sort((a,b)=>a-b).map(p=>"POT"+p).join(", ")
     : "なし（総数のみ）";
 
-  document.getElementById("currentSelection").textContent =
-    `施設: ${facText} ／ POT: ${potText} ／ 表示: ${showDaily?"日別 ":""}${showMA?"7日平均":""}`;
+const periodText =
+  (!selectedStartDate && !selectedEndDate)
+    ? "全期間"
+    : `${selectedStartDate || "…"} 〜 ${selectedEndDate || "…"}`;
+
+document.getElementById("currentSelection").textContent =
+  `施設: ${facText} ／ POT: ${potText} ／ 期間: ${periodText} ／ 表示: ${showDaily?"日別 ":""}${showMA?"7日平均":""}`;
+
 }
 
 // =======================================================
