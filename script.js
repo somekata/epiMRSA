@@ -1,18 +1,18 @@
 // /epiMRSA/script.js
-// CSV(local) → ①時系列(選択UIあり) ②施設間比較 ③raw表示
+// CSV(local) → ①時系列(選択UIあり) ②施設間比較(棒＋地図なしパイ) ③raw表示
 
 let records = [];
 
 // Chart instances
 let timeCharts = [];
 let barChart = null;
-let pieCharts = {};
+let pieCharts = {}; // key -> Chart
 
 // 表示状態
 let showDaily = true;
 let showMA = true;
 let selectedGroups = new Set(["ALL"]);  // ALLと施設名が入る
-let selectedPots = new Set();           // CSV読み込み後に全POTで初期化
+let selectedPots = new Set();           // CSV読み込み後に全POTで初期化。空ならPOT線なし
 
 // POT色
 const POT_COLORS = {
@@ -23,33 +23,70 @@ const POT_COLORS = {
   5: "#FF8A7A"
 };
 
-// ===== CSV読み込み =====
+// ===== Center text plugin for doughnut =====
+const centerTextPlugin = {
+  id: "centerText",
+  afterDraw(chart, args, opts) {
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return;
+    const x = (chartArea.left + chartArea.right) / 2;
+    const y = (chartArea.top + chartArea.bottom) / 2;
+    ctx.save();
+    ctx.font = `bold ${opts.fontSize || 14}px system-ui`;
+    ctx.fillStyle = opts.color || "#111827";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(opts.text || "", x, y);
+    ctx.restore();
+  }
+};
+Chart.register(centerTextPlugin);
+
+// ========== CSV読み込み ==========
 document.getElementById("fileInput").addEventListener("change", handleCSV);
 
 function handleCSV(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
 
-  const reader = new FileReader();
-  reader.onload = (evt) => {
-    const text = evt.target.result;
-    records = parseCSV(text);
+  // 1) まず records を空に（クリアして読み直す運用）
+  records = [];
 
-    if (!records.length) {
-      document.getElementById("loadStatus").textContent = "読み込み失敗：CSV形式を確認してください";
-      return;
-    }
+  let pending = files.length;
 
-    document.getElementById("loadStatus").textContent =
-      `読み込み成功：${records.length} レコード`;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target.result;
+      const parsed = parseCSV(text).map(r => ({
+        ...r,
+        sourceFile: file.name   // 出自を記録
+      }));
+      // ★ 2) records に順次追加（重複は現時点で考えない）
+      records = records.concat(parsed);
 
-    // 初期選択：ALL＋全施設、全POT
-    initSelectionsAfterLoad();
+      pending--;
+      if (pending === 0) {
+        // ★ 3) 全ファイル読込み完了後に実行
+        document.getElementById("loadStatus").textContent =
+          `${files.length} ファイル読み込み・計 ${records.length} レコード`;
 
-    updateAll();
-  };
-  reader.readAsText(file);
+        showLoadedFileList(files);
+        initSelectionsAfterLoad();
+        updateAll();
+      }
+    };
+    reader.readAsText(file);
+  });
 }
+
+function showLoadedFileList(files) {
+  const div = document.getElementById("fileList");
+  if (!div) return;
+  div.innerHTML = "<strong>読み込みファイル:</strong><br>" +
+    files.map(f => `・${f.name}`).join("<br>");
+}
+
 
 function parseCSV(txt) {
   const lines = txt.trim().split(/\r?\n/);
@@ -82,7 +119,7 @@ function initSelectionsAfterLoad(){
   const pots = getPots();
 
   selectedGroups = new Set(["ALL", ...facilities]);
-  selectedPots = new Set(pots);
+  selectedPots = new Set(pots); // 初期は全POT表示
 
   buildFacilityModalOptions();
   buildPotModalOptions();
@@ -135,11 +172,13 @@ function movingAverage(arr, n) {
 function updateAll(){
   drawTimeSeries();
   drawFacilityComparison();
+  drawFacilityPieGrid();
   showTable();
 }
 
 // =======================================================
-// ① 時系列：表示コントロールに従って再描画
+// ① 時系列
+//   - selectedPots が空なら POT補助線を出さない（総数のみ）
 // =======================================================
 function drawTimeSeries() {
   const wrap = document.getElementById("timeChartsWrap");
@@ -150,9 +189,10 @@ function drawTimeSeries() {
   const facilities = getFacilities();
   const potsAll = getPots();
 
-  // 選択されたPOTだけ使う
-  const potList = potsAll.filter(p => selectedPots.has(p));
-  if (potList.length === 0) potList.push(...potsAll); // 全解除防止の保険
+  // 選択されたPOTだけ（空ならPOT線なし）
+  const potList = selectedPots.size
+    ? potsAll.filter(p => selectedPots.has(p))
+    : [];
 
   // 選択されたグループを並べる
   const groups = [];
@@ -161,7 +201,11 @@ function drawTimeSeries() {
   }
   facilities.forEach(f=>{
     if (selectedGroups.has(f)) {
-      groups.push({ key:f, label:`施設 ${f}`, data: records.filter(r=>r.facility===f) });
+      groups.push({
+        key:f,
+        label:`施設 ${f}`,
+        data: records.filter(r=>r.facility===f)
+      });
     }
   });
   if (groups.length === 0) groups.push({ key:"ALL", label:"全体", data: records });
@@ -182,22 +226,9 @@ function drawTimeSeries() {
     const totalCounts = dailyTotal.map(d=>d.count);
     const ma7 = movingAverage(totalCounts, 7);
 
-    // POT別 date→count map
-    const potDateCount = {};
-    potList.forEach(p => potDateCount[p] = new Map());
-    g.data.forEach(r=>{
-      const d = normalizeDate(r.date);
-      if (!selectedPots.has(r.pot)) return;
-      potDateCount[r.pot].set(d, (potDateCount[r.pot].get(d)||0)+1);
-    });
-    const potSeries = potList.map(p=>({
-      pot:p,
-      data: labels.map(d=>potDateCount[p].get(d)||0)
-    }));
-
     const datasets = [];
 
-    // 元の総数日別
+    // 総数日別
     if (showDaily){
       datasets.push({
         label:"日別件数（総数）",
@@ -210,7 +241,7 @@ function drawTimeSeries() {
       });
     }
 
-    // 元の7日平均
+    // 総数7日平均
     if (showMA){
       datasets.push({
         label:"7日移動平均（総数）",
@@ -223,18 +254,30 @@ function drawTimeSeries() {
       });
     }
 
-    // POT別補助線
-    potSeries.forEach((ps,i)=>{
-      datasets.push({
-        label:`POT${ps.pot}`,
-        data: ps.data,
-        borderColor: POT_COLORS[ps.pot] || `hsl(${i*60},70%,60%)`,
-        borderWidth:1.5,
-        tension:0,
-        pointRadius:0,
-        borderDash:[4,3]
+    // POT線（選択POTがある時だけ）
+    if (potList.length > 0){
+      const potDateCount = {};
+      potList.forEach(p => potDateCount[p] = new Map());
+
+      g.data.forEach(r=>{
+        if (!selectedPots.has(r.pot)) return;
+        const d = normalizeDate(r.date);
+        potDateCount[r.pot].set(d, (potDateCount[r.pot].get(d)||0)+1);
       });
-    });
+
+      potList.forEach((p,i)=>{
+        const series = labels.map(d=>potDateCount[p].get(d)||0);
+        datasets.push({
+          label:`POT${p}`,
+          data: series,
+          borderColor: POT_COLORS[p] || `hsl(${i*60},70%,60%)`,
+          borderWidth:1.5,
+          tension:0,
+          pointRadius:0,
+          borderDash:[4,3]
+        });
+      });
+    }
 
     const chart = new Chart(canvas, {
       type:"line",
@@ -254,7 +297,7 @@ function drawTimeSeries() {
 }
 
 // =======================================================
-// ② 施設間比較（積み上げ棒 + A/B/C円グラフ）
+// ② 施設間比較：積み上げ棒（ALL + 各施設）
 // =======================================================
 function drawFacilityComparison() {
   if (!records.length) return;
@@ -264,59 +307,149 @@ function drawFacilityComparison() {
 
   const facilityCounts = {};
   facs.forEach(f=>{
-    facilityCounts[f]={};
-    potList.forEach(p=>facilityCounts[f][p]=0);
+    facilityCounts[f] = {};
+    potList.forEach(p=>facilityCounts[f][p] = 0);
   });
   records.forEach(r=>{
     facilityCounts[r.facility][r.pot]++;
   });
 
+  // ALLを作る
+  const allCounts = {};
+  potList.forEach(p=>{
+    allCounts[p] = facs.reduce((sum,f)=>sum + facilityCounts[f][p],0);
+  });
+
+  const labels = ["ALL", ...facs];
+
   const barData = {
-    labels: facs,
+    labels,
     datasets: potList.map((p,i)=>({
       label:`POT${p}`,
-      data:facs.map(f=>facilityCounts[f][p]),
-      backgroundColor:POT_COLORS[p] || `hsl(${i*60},70%,60%)`
+      data: labels.map(l=>{
+        if(l==="ALL") return allCounts[p];
+        return facilityCounts[l][p];
+      }),
+      backgroundColor: POT_COLORS[p] || `hsl(${i*60},70%,60%)`
     }))
   };
 
   if (barChart) barChart.destroy();
   const barCtx = document.getElementById("facilityBar");
   if (!barCtx) return;
+
   barChart = new Chart(barCtx,{
     type:"bar",
     data:barData,
     options:{
       responsive:true,
       plugins:{ legend:{ position:"bottom" } },
-      scales:{ x:{ stacked:true }, y:{ stacked:true, beginAtZero:true } }
+      scales:{
+        x:{ stacked:true },
+        y:{ stacked:true, beginAtZero:true }
+      }
     }
-  });
-
-  // Map pies (A/B/Cのみ)
-  const pieIDs = {A:"pieA",B:"pieB",C:"pieC"};
-  Object.keys(pieCharts).forEach(k=>pieCharts[k].destroy());
-  pieCharts={};
-
-  Object.keys(pieIDs).forEach(f=>{
-    const canvas = document.getElementById(pieIDs[f]);
-    if(!canvas || !facilityCounts[f]) return;
-    pieCharts[f]=new Chart(canvas,{
-      type:"doughnut",
-      data:{
-        labels:potList.map(p=>`POT${p}`),
-        datasets:[{
-          data:potList.map(p=>facilityCounts[f][p]),
-          backgroundColor:potList.map((p,i)=>POT_COLORS[p]||`hsl(${i*60},70%,60%)`)
-        }]
-      },
-      options:{ plugins:{legend:{display:false}}, cutout:"45%" }
-    });
   });
 }
 
 // =======================================================
-// ③ raw表示
+// ③ 施設間比較：地図なしパイ（グリッド）
+//   - 施設ごと＋ALL
+//   - 円の大きさは総数に比例（scale）
+//   - 中央に施設名
+// =======================================================
+function drawFacilityPieGrid(){
+  const grid = document.getElementById("facilityPieGrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  if(!records.length) return;
+
+  // 既存pie破棄
+  Object.values(pieCharts).forEach(ch=>ch.destroy());
+  pieCharts = {};
+
+  const facs = getFacilities();
+  const potList = getPots();
+
+  // counts作成
+  const facilityCounts = {};
+  facs.forEach(f=>{
+    facilityCounts[f] = {};
+    potList.forEach(p=>facilityCounts[f][p] = 0);
+  });
+  records.forEach(r=>{
+    facilityCounts[r.facility][r.pot]++;
+  });
+
+  const allCounts = {};
+  potList.forEach(p=>{
+    allCounts[p] = facs.reduce((sum,f)=>sum + facilityCounts[f][p],0);
+  });
+
+  const groups = ["ALL", ...facs];
+
+  // 総数（サイズ計算用）
+  const totals = groups.map(g=>{
+    const obj = (g==="ALL") ? allCounts : facilityCounts[g];
+    return potList.reduce((s,p)=>s+obj[p],0);
+  });
+  const maxTotal = Math.max(...totals, 1);
+
+  groups.forEach((g, idx)=>{
+    const obj = (g==="ALL") ? allCounts : facilityCounts[g];
+    const dataArr = potList.map(p=>obj[p]);
+
+    const total = totals[idx];
+    const scale = 0.6 + 0.8*(total/maxTotal); // 0.6〜1.4くらい
+
+    const card = document.createElement("div");
+    card.className = "pie-card";
+    card.innerHTML = `<canvas class="pie-canvas"></canvas>`;
+    grid.appendChild(card);
+
+    const canvas = card.querySelector("canvas");
+    canvas.style.transform = `scale(${scale.toFixed(2)})`;
+
+    const chart = new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels: potList.map(p=>`POT${p}`),
+        datasets: [{
+          data: dataArr,
+          backgroundColor: potList.map(p=>POT_COLORS[p] || "#94a3b8"),
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true },
+          centerText: {
+            text: (g==="ALL") ? "ALL" : g,
+            fontSize: 16,
+            color: "#0f172a"
+          }
+        },
+        cutout: "62%"
+      }
+    });
+
+    pieCharts[g] = chart;
+
+    // 施設名＋総数を下にうっすら
+    const label = document.createElement("div");
+    label.style.marginTop = "6px";
+    label.style.fontSize = "0.85rem";
+    label.style.color = "#475569";
+    label.textContent = `${(g==="ALL")?"全体":("施設 "+g)}（n=${total}）`;
+    card.appendChild(label);
+  });
+}
+
+// =======================================================
+// ④ raw表示
 // =======================================================
 function showTable(){
   const div=document.getElementById("rawTable");
@@ -340,13 +473,21 @@ const toggleMABtn = document.getElementById("toggleMA");
 toggleDailyBtn.addEventListener("click", ()=>{
   showDaily = !showDaily;
   toggleDailyBtn.classList.toggle("active", showDaily);
-  if(!showDaily && !showMA){ showMA=true; toggleMABtn.classList.add("active"); }
+  if(!showDaily && !showMA){
+    showMA=true;
+    toggleMABtn.classList.add("active");
+  }
+  updateSelectionText();
   drawTimeSeries();
 });
 toggleMABtn.addEventListener("click", ()=>{
   showMA = !showMA;
   toggleMABtn.classList.toggle("active", showMA);
-  if(!showDaily && !showMA){ showDaily=true; toggleDailyBtn.classList.add("active"); }
+  if(!showDaily && !showMA){
+    showDaily=true;
+    toggleDailyBtn.classList.add("active");
+  }
+  updateSelectionText();
   drawTimeSeries();
 });
 
@@ -368,20 +509,22 @@ function buildFacilityModalOptions(){
 
   items.forEach(key=>{
     const label = key==="ALL" ? "全体(ALL)" : `施設 ${key}`;
-    const id = `fac_${key}`;
     const checked = selectedGroups.has(key);
 
     const el = document.createElement("label");
-    el.innerHTML = `<input type="checkbox" id="${id}" data-key="${key}" ${checked?"checked":""}> ${label}`;
+    el.innerHTML =
+      `<input type="checkbox" data-key="${key}" ${checked?"checked":""}> ${label}`;
     box.appendChild(el);
   });
 }
 
 document.getElementById("facilityAllOn").addEventListener("click", ()=>{
-  document.querySelectorAll("#facilityOptions input").forEach(cb=>cb.checked=true);
+  document.querySelectorAll("#facilityOptions input")
+    .forEach(cb=>cb.checked=true);
 });
 document.getElementById("facilityAllOff").addEventListener("click", ()=>{
-  document.querySelectorAll("#facilityOptions input").forEach(cb=>cb.checked=false);
+  document.querySelectorAll("#facilityOptions input")
+    .forEach(cb=>cb.checked=false);
 });
 
 document.getElementById("facilityApply").addEventListener("click", ()=>{
@@ -389,7 +532,7 @@ document.getElementById("facilityApply").addEventListener("click", ()=>{
   document.querySelectorAll("#facilityOptions input").forEach(cb=>{
     if(cb.checked) newSet.add(cb.dataset.key);
   });
-  if(newSet.size===0) newSet.add("ALL"); // 全解除防止
+  if(newSet.size===0) newSet.add("ALL"); // 全解除防止（施設は最低1つ）
   selectedGroups = newSet;
   closeModal(facilityModal);
   updateSelectionText();
@@ -398,6 +541,7 @@ document.getElementById("facilityApply").addEventListener("click", ()=>{
 
 // =======================================================
 // UI：POTモーダル
+//   - 全解除OK → POT線なし（総数のみ）
 // =======================================================
 const potModal = document.getElementById("potModal");
 document.getElementById("potSelectBtn").addEventListener("click", ()=>{
@@ -411,19 +555,21 @@ function buildPotModalOptions(){
 
   const potList = getPots();
   potList.forEach(p=>{
-    const id = `pot_${p}`;
     const checked = selectedPots.has(p);
     const el = document.createElement("label");
-    el.innerHTML = `<input type="checkbox" id="${id}" data-pot="${p}" ${checked?"checked":""}> POT${p}`;
+    el.innerHTML =
+      `<input type="checkbox" data-pot="${p}" ${checked?"checked":""}> POT${p}`;
     box.appendChild(el);
   });
 }
 
 document.getElementById("potAllOn").addEventListener("click", ()=>{
-  document.querySelectorAll("#potOptions input").forEach(cb=>cb.checked=true);
+  document.querySelectorAll("#potOptions input")
+    .forEach(cb=>cb.checked=true);
 });
 document.getElementById("potAllOff").addEventListener("click", ()=>{
-  document.querySelectorAll("#potOptions input").forEach(cb=>cb.checked=false);
+  document.querySelectorAll("#potOptions input")
+    .forEach(cb=>cb.checked=false);
 });
 
 document.getElementById("potApply").addEventListener("click", ()=>{
@@ -431,8 +577,9 @@ document.getElementById("potApply").addEventListener("click", ()=>{
   document.querySelectorAll("#potOptions input").forEach(cb=>{
     if(cb.checked) newSet.add(Number(cb.dataset.pot));
   });
-  if(newSet.size===0) newSet.add(...getPots()); // 全解除防止
+  // newSetが空なら「POT線なし」として空のまま採用
   selectedPots = newSet;
+
   closeModal(potModal);
   updateSelectionText();
   drawTimeSeries();
@@ -459,8 +606,11 @@ document.querySelectorAll(".modal .close, .modal-bg").forEach(el=>{
 function updateSelectionText(){
   const facText = Array.from(selectedGroups)
     .map(k=>k==="ALL"?"全体":"施設"+k).join(", ");
-  const potText = Array.from(selectedPots)
-    .sort((a,b)=>a-b).map(p=>"POT"+p).join(", ");
+
+  const potText = selectedPots.size
+    ? Array.from(selectedPots).sort((a,b)=>a-b).map(p=>"POT"+p).join(", ")
+    : "なし（総数のみ）";
+
   document.getElementById("currentSelection").textContent =
     `施設: ${facText} ／ POT: ${potText} ／ 表示: ${showDaily?"日別 ":""}${showMA?"7日平均":""}`;
 }
@@ -470,10 +620,13 @@ function updateSelectionText(){
 // =======================================================
 document.querySelectorAll(".tab-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-btn")
+      .forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
+
     const tab=btn.dataset.tab;
-    document.querySelectorAll(".tab-content").forEach(sec=>sec.classList.remove("active"));
+    document.querySelectorAll(".tab-content")
+      .forEach(sec=>sec.classList.remove("active"));
     document.getElementById(tab).classList.add("active");
   });
 });

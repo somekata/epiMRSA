@@ -109,26 +109,43 @@ body {
   color: #111827;
 }
 
-/* ===== Map + Pie charts ===== */
-#mapArea {
-  margin-top: 20px;
-  position: relative;
+/* ===== 施設間比較 ===== */
+.facility-block{
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:12px;
+  margin:10px 0 16px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
 }
-#baseMap {
-  width: 90%;
-  max-width: 700px;
-  display: block;
+.facility-block h3{
+  margin:0 0 8px;
+  font-size:1rem;
+  color:#0f172a;
 }
-.pie {
-  position: absolute;
-  width: 120px;
-  height: 120px;
-  pointer-events: none;
+
+/* Pie grid */
+.pie-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap:12px;
+  align-items:center;
 }
-/* Facilities positions (adjustable) */
-#pieA { left: 18%; top: 20%; }
-#pieB { left: 63%; top: 25%; }
-#pieC { left: 38%; top: 62%; }
+.pie-card{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:#f8fafc;
+  border:1px dashed #cbd5e1;
+  border-radius:12px;
+  padding:10px;
+  min-height:210px;
+}
+.pie-canvas{
+  width:160px; /* JSでtransform scaleをかける前提 */
+  height:160px;
+}
 
 /* ===== Modal ===== */
 .modal.hidden{ display:none; }
@@ -181,4 +198,10 @@ table {
 table th, table td {
   padding: 6px;
   border: 1px solid #ccc;
+}
+
+#fileList {
+  color: #e2e8f0;
+  margin-left: 10px;
+  font-size: 0.85rem;
 }

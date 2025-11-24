@@ -10,7 +10,8 @@
     <!-- CSV読込エリア -->
     <header id="loader">
       <h1>epiMRSA Viewer</h1>
-      <input type="file" id="fileInput" accept=".csv" />
+      <input type="file" id="fileInput" multiple accept=".csv" />
+      <div id="fileList"></div>
       <span id="loadStatus"></span>
     </header>
 
@@ -26,7 +27,7 @@
       <section id="time" class="tab-content active">
         <h2>時系列（表示対象を選択）</h2>
 
-        <!-- ★表示コントロール -->
+        <!-- 表示コントロール -->
         <div class="controls">
           <div class="seg">
             <button id="toggleDaily" class="seg-btn active">日別</button>
@@ -41,21 +42,22 @@
           </div>
         </div>
 
-        <!-- ★ここに「全体＋施設別グラフ」を動的生成 -->
+        <!-- 全体＋施設別グラフを動的生成 -->
         <div id="timeChartsWrap" class="charts-wrap"></div>
       </section>
 
-      <!-- 施設間比較 -->
+      <!-- 施設間比較（地図なし：棒＋グリッドパイ） -->
       <section id="facility" class="tab-content">
-        <h2>施設間比較（棒グラフ + 地図）</h2>
+        <h2>施設間比較</h2>
 
-        <canvas id="facilityBar"></canvas>
+        <div class="facility-block">
+          <h3>積み上げ棒グラフ（ALL + 各施設）</h3>
+          <canvas id="facilityBar"></canvas>
+        </div>
 
-        <div id="mapArea">
-          <img src="img/map.png" id="baseMap" />
-          <canvas id="pieA" class="pie"></canvas>
-          <canvas id="pieB" class="pie"></canvas>
-          <canvas id="pieC" class="pie"></canvas>
+        <div class="facility-block">
+          <h3>POT構成比（地図なしパイ：件数に応じて円サイズ変化）</h3>
+          <div id="facilityPieGrid" class="pie-grid"></div>
         </div>
       </section>
 
