@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>epiMRSA Viewer</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <!-- CSV読込エリア -->
+    <header id="loader">
+      <h1>epiMRSA Viewer</h1>
+      <input type="file" id="fileInput" accept=".csv" />
+      <span id="loadStatus"></span>
+    </header>
+
+    <!-- タブ -->
+    <nav id="tabs">
+      <button class="tab-btn active" data-tab="time">時系列</button>
+      <button class="tab-btn" data-tab="facility">施設間比較</button>
+      <button class="tab-btn" data-tab="other">その他</button>
+    </nav>
+
+    <main id="contents">
+      <!-- 時系列 -->
+      <section id="time" class="tab-content active">
+        <h2>時系列（表示対象を選択）</h2>
+
+        <!-- ★表示コントロール -->
+        <div class="controls">
+          <div class="seg">
+            <button id="toggleDaily" class="seg-btn active">日別</button>
+            <button id="toggleMA" class="seg-btn active">7日平均</button>
+          </div>
+
+          <button id="facilitySelectBtn" class="ctrl-btn">施設を選ぶ</button>
+          <button id="potSelectBtn" class="ctrl-btn">POTを選ぶ</button>
+
+          <div id="currentSelection" class="selection-text">
+            未選択（CSV読み込み後に選択可）
+          </div>
+        </div>
+
+        <!-- ★ここに「全体＋施設別グラフ」を動的生成 -->
+        <div id="timeChartsWrap" class="charts-wrap"></div>
+      </section>
+
+      <!-- 施設間比較 -->
+      <section id="facility" class="tab-content">
+        <h2>施設間比較（棒グラフ + 地図）</h2>
+
+        <canvas id="facilityBar"></canvas>
+
+        <div id="mapArea">
+          <img src="img/map.png" id="baseMap" />
+          <canvas id="pieA" class="pie"></canvas>
+          <canvas id="pieB" class="pie"></canvas>
+          <canvas id="pieC" class="pie"></canvas>
+        </div>
+      </section>
+
+      <!-- その他 -->
+      <section id="other" class="tab-content">
+        <h2>その他</h2>
+        <p>CSVの一覧表示や統計量などを後から追加できます。</p>
+        <div id="rawTable"></div>
+      </section>
+    </main>
+
+    <!-- ===== 施設選択モーダル ===== -->
+    <div id="facilityModal" class="modal hidden">
+      <div class="modal-bg"></div>
+      <div class="modal-box">
+        <h3>表示する施設を選択</h3>
+        <div id="facilityOptions" class="modal-options"></div>
+
+        <div class="modal-actions">
+          <button id="facilityAllOn" class="ghost">全選択</button>
+          <button id="facilityAllOff" class="ghost">全解除</button>
+          <button id="facilityApply" class="primary">適用</button>
+          <button class="close">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== POT選択モーダル ===== -->
+    <div id="potModal" class="modal hidden">
+      <div class="modal-bg"></div>
+      <div class="modal-box">
+        <h3>表示するPOTを選択</h3>
+        <div id="potOptions" class="modal-options"></div>
+
+        <div class="modal-actions">
+          <button id="potAllOn" class="ghost">全選択</button>
+          <button id="potAllOff" class="ghost">全解除</button>
+          <button id="potApply" class="primary">適用</button>
+          <button class="close">閉じる</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

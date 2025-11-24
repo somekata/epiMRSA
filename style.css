@@ -1,0 +1,184 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f8fafc;
+  color: #333;
+}
+
+/* CSV Loader */
+#loader {
+  background: #334155;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+#loader h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+/* Tabs */
+#tabs {
+  display: flex;
+  background: #e2e8f0;
+  padding: 8px;
+  gap: 10px;
+}
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: #cbd5e1;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.tab-btn.active {
+  background: #475569;
+  color: #fff;
+}
+
+/* Tab content */
+.tab-content {
+  display: none;
+  padding: 20px;
+}
+.tab-content.active {
+  display: block;
+}
+
+/* ===== 時系列コントロール ===== */
+.controls{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin:8px 0 12px;
+}
+
+.seg{
+  display:flex;
+  background:#e5e7eb;
+  border-radius:999px;
+  overflow:hidden;
+}
+.seg-btn{
+  border:none;
+  padding:8px 12px;
+  cursor:pointer;
+  background:transparent;
+  font-weight:700;
+}
+.seg-btn.active{
+  background:#0f172a;
+  color:#fff;
+}
+
+.ctrl-btn{
+  border:1px solid #cbd5e1;
+  background:#fff;
+  padding:8px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:700;
+}
+
+.selection-text{
+  font-size:0.9rem;
+  color:#475569;
+}
+
+/* ===== 時系列グラフ並び ===== */
+.charts-wrap{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px,1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.chart-card{
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.chart-card h3{
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+/* ===== Map + Pie charts ===== */
+#mapArea {
+  margin-top: 20px;
+  position: relative;
+}
+#baseMap {
+  width: 90%;
+  max-width: 700px;
+  display: block;
+}
+.pie {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+}
+/* Facilities positions (adjustable) */
+#pieA { left: 18%; top: 20%; }
+#pieB { left: 63%; top: 25%; }
+#pieC { left: 38%; top: 62%; }
+
+/* ===== Modal ===== */
+.modal.hidden{ display:none; }
+.modal{
+  position:fixed; inset:0; z-index:1000;
+  display:flex; justify-content:center; align-items:center;
+}
+.modal-bg{
+  position:absolute; inset:0; background:rgba(15,23,42,0.55);
+}
+.modal-box{
+  position:relative;
+  width:min(520px, 92vw);
+  background:#fff;
+  border-radius:14px;
+  padding:14px;
+  box-shadow:0 12px 30px rgba(0,0,0,0.25);
+}
+.modal-box h3{ margin:0 0 8px; }
+
+.modal-options{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:6px;
+  padding:6px 0 10px;
+}
+.modal-options label{
+  display:flex; gap:6px; align-items:center;
+  background:#f1f5f9; padding:6px 8px; border-radius:8px;
+}
+
+.modal-actions{
+  display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;
+}
+.modal-actions .ghost{
+  background:#fff; border:1px solid #cbd5e1; padding:6px 10px; border-radius:8px; cursor:pointer;
+}
+.modal-actions .primary{
+  background:#0ea5e9; color:#fff; border:none; padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:800;
+}
+.modal-actions .close{
+  background:#e2e8f0; border:none; padding:6px 10px; border-radius:8px; cursor:pointer;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+table th, table td {
+  padding: 6px;
+  border: 1px solid #ccc;
+}
